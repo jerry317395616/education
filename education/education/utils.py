@@ -33,26 +33,29 @@ def get_overlap_for(doc, doctype, fieldname, value=None):
 	:param fieldname: Checks Overlap for this field
 	"""
 
-	existing = frappe.db.sql(
-		"""select name, from_time, to_time from `tab{0}`
-		where `{1}`=%(val)s and schedule_date = %(schedule_date)s and
-		(
-			(from_time > %(from_time)s and from_time < %(to_time)s) or
-			(to_time > %(from_time)s and to_time < %(to_time)s) or
-			(%(from_time)s > from_time and %(from_time)s < to_time) or
-			(%(from_time)s = from_time and %(to_time)s = to_time))
-		and name!=%(name)s and docstatus!=2""".format(
-			doctype, fieldname
-		),
-		{
-			"schedule_date": doc.schedule_date,
-			"val": value or doc.get(fieldname),
-			"from_time": doc.from_time,
-			"to_time": doc.to_time,
-			"name": doc.name or "No Name",
-		},
-		as_dict=True,
+	meta = frappe.get_meta(doctype)
+	if not meta.has_field(fieldname):
+		frappe.throw(_("Invalid overlap field {0} for {1}").format(fieldname, doctype))
+
+	table = frappe.qb.DocType(doctype)
+	from_time = doc.from_time
+	to_time = doc.to_time
+	time_overlap = (
+		((table.from_time > from_time) & (table.from_time < to_time))
+		| ((table.to_time > from_time) & (table.to_time < to_time))
+		| ((table.from_time < from_time) & (table.to_time > from_time))
+		| ((table.from_time == from_time) & (table.to_time == to_time))
 	)
+	existing = (
+		frappe.qb.from_(table)
+		.select(table.name, table.from_time, table.to_time)
+		.where(table[fieldname] == (value or doc.get(fieldname)))
+		.where(table.schedule_date == doc.schedule_date)
+		.where(time_overlap)
+		.where(table.name != (doc.name or "No Name"))
+		.where(table.docstatus != 2)
+		.limit(1)
+	).run(as_dict=True)
 
 	return existing[0] if existing else None
 
@@ -106,9 +109,7 @@ def get_enrollment(master, document, student):
 			filters={"student": student, "program": document, "docstatus": 1},
 		)
 	if master == "course":
-		enrollments = frappe.get_all(
-			"Course Enrollment", filters={"student": student, "course": document}
-		)
+		enrollments = frappe.get_all("Course Enrollment", filters={"student": student, "course": document})
 
 	if enrollments:
 		return enrollments[0].name
@@ -131,7 +132,7 @@ def enroll_in_program(program_name, student=None):
 	if has_super_access():
 		return
 
-	if not student == None:
+	if student is not None:
 		student = frappe.get_doc("Student", student)
 	else:
 		# Check if self enrollment in allowed
@@ -213,9 +214,7 @@ def evaluate_quiz(quiz_response, quiz_name, course, program, time_taken):
 	if student:
 		enrollment = get_or_create_course_enrollment(course, program)
 		if quiz.allowed_attempt(enrollment, quiz_name):
-			enrollment.add_quiz_activity(
-				quiz_name, quiz_response, result, score, status, time_taken
-			)
+			enrollment.add_quiz_activity(quiz_name, quiz_response, result, score, status, time_taken)
 			return {"result": result, "score": score, "status": status}
 		else:
 			return None
@@ -235,9 +234,7 @@ def get_quiz(quiz_name, course):
 			"name": question.name,
 			"question": question.question,
 			"type": question.question_type,
-			"options": [
-				{"name": option.name, "option": option.option} for option in question.options
-			],
+			"options": [{"name": option.name, "option": option.option} for option in question.options],
 		}
 		for question in questions
 	]
@@ -301,9 +298,7 @@ def get_course_progress(course, program):
 		if progress:
 			course_progress.append(progress)
 	if course_progress:
-		number_of_completed_topics = sum(
-			[activity["completed"] for activity in course_progress]
-		)
+		number_of_completed_topics = sum([activity["completed"] for activity in course_progress])
 		total_topics = len(course_progress)
 		if total_topics == 1:
 			return course_progress[0]
@@ -353,9 +348,7 @@ def get_program_completion(program):
 			progress.append(topic_progress)
 
 	if progress:
-		number_of_completed_topics = sum(
-			[activity["completed"] for activity in progress if activity]
-		)
+		number_of_completed_topics = sum([activity["completed"] for activity in progress if activity])
 		total_topics = len(progress)
 		try:
 			return int((float(number_of_completed_topics) / total_topics) * 100)

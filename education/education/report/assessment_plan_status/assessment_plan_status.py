@@ -6,6 +6,8 @@ from itertools import groupby
 
 import frappe
 from frappe import _
+from frappe.query_builder import Order
+from frappe.query_builder.functions import Count
 from frappe.utils import cint
 
 DOCSTATUS = {
@@ -33,46 +35,37 @@ def get_assessment_data(args=None):
 	# [total, saved, submitted, remaining]
 	chart_data = [0, 0, 0, 0]
 
-	condition = ""
+	assessment_plan_doc = frappe.qb.DocType("Assessment Plan")
+	student_group_student = frappe.qb.DocType("Student Group Student")
+	student_group_strength = (
+		frappe.qb.from_(student_group_student)
+		.select(Count("*"))
+		.where(student_group_student.parent == assessment_plan_doc.student_group)
+	)
+	query = (
+		frappe.qb.from_(assessment_plan_doc)
+		.select(
+			assessment_plan_doc.name.as_("assessment_plan"),
+			assessment_plan_doc.assessment_name,
+			assessment_plan_doc.student_group,
+			assessment_plan_doc.schedule_date,
+			student_group_strength.as_("student_group_strength"),
+		)
+		.where(assessment_plan_doc.docstatus == 1)
+	)
 	if args["assessment_group"]:
-		condition += "and assessment_group = %(assessment_group)s"
+		query = query.where(assessment_plan_doc.assessment_group == args["assessment_group"])
 	if args["schedule_date"]:
-		condition += "and schedule_date <= %(schedule_date)s"
+		query = query.where(assessment_plan_doc.schedule_date <= args["schedule_date"])
+	assessment_plan = query.orderby(assessment_plan_doc.modified, order=Order.desc).run(as_dict=True)
 
-	assessment_plan = frappe.db.sql(
-		"""
-			SELECT
-				ap.name as assessment_plan,
-				ap.assessment_name,
-				ap.student_group,
-				ap.schedule_date,
-				(select count(*) from `tabStudent Group Student` sgs where sgs.parent=ap.student_group)
-					as student_group_strength
-			FROM
-				`tabAssessment Plan` ap
-			WHERE
-				ap.docstatus = 1 {condition}
-			ORDER BY
-				ap.modified desc
-		""".format(
-			condition=condition
-		),
-		(args),
-		as_dict=1,
-	)
-
-	assessment_plan_list = (
-		[d.assessment_plan for d in assessment_plan] if assessment_plan else [""]
-	)
+	assessment_plan_list = [d.assessment_plan for d in assessment_plan] if assessment_plan else [""]
 	assessment_result = get_assessment_result(assessment_plan_list)
 
 	for d in assessment_plan:
-
 		assessment_plan_details = assessment_result.get(d.assessment_plan)
 		assessment_plan_details = (
-			frappe._dict()
-			if not assessment_plan_details
-			else frappe._dict(assessment_plan_details)
+			frappe._dict() if not assessment_plan_details else frappe._dict(assessment_plan_details)
 		)
 		if "saved" not in assessment_plan_details:
 			assessment_plan_details.update({"saved": 0})

@@ -30,9 +30,7 @@ def enroll_student(source_name):
 
 	:param source_name: Student Applicant.
 	"""
-	frappe.publish_realtime(
-		"enroll_student_progress", {"progress": [1, 4]}, user=frappe.session.user
-	)
+	frappe.publish_realtime("enroll_student_progress", {"progress": [1, 4]}, user=frappe.session.user)
 	student = get_mapped_doc(
 		"Student Applicant",
 		source_name,
@@ -63,9 +61,7 @@ def enroll_student(source_name):
 	program_enrollment.academic_term = student_applicant.academic_term
 	program_enrollment.save()
 
-	frappe.publish_realtime(
-		"enroll_student_progress", {"progress": [2, 4]}, user=frappe.session.user
-	)
+	frappe.publish_realtime("enroll_student_progress", {"progress": [2, 4]}, user=frappe.session.user)
 	return program_enrollment
 
 
@@ -78,19 +74,13 @@ def check_attendance_records_exist(course_schedule=None, student_group=None, dat
 	:param date: Date.
 	"""
 	if course_schedule:
-		return frappe.get_list(
-			"Student Attendance", filters={"course_schedule": course_schedule}
-		)
+		return frappe.get_list("Student Attendance", filters={"course_schedule": course_schedule})
 	else:
-		return frappe.get_list(
-			"Student Attendance", filters={"student_group": student_group, "date": date}
-		)
+		return frappe.get_list("Student Attendance", filters={"student_group": student_group, "date": date})
 
 
 @frappe.whitelist()
-def mark_attendance(
-	students_present, students_absent, course_schedule=None, student_group=None, date=None
-):
+def mark_attendance(students_present, students_absent, course_schedule=None, student_group=None, date=None):
 	"""Creates Multiple Attendance Records.
 
 	:param students_present: Students Present JSON.
@@ -105,9 +95,7 @@ def mark_attendance(
 			year_start_date, year_end_date = frappe.db.get_value(
 				"Academic Year", academic_year, ["year_start_date", "year_end_date"]
 			)
-			if getdate(date) < getdate(year_start_date) or getdate(date) > getdate(
-				year_end_date
-			):
+			if getdate(date) < getdate(year_start_date) or getdate(date) > getdate(year_end_date):
 				frappe.throw(
 					_("Attendance cannot be marked outside of Academic Year {0}").format(academic_year)
 				)
@@ -125,7 +113,6 @@ def mark_attendance(
 			d["student"], d["student_name"], "Absent", course_schedule, student_group, date
 		)
 
-	frappe.db.commit()
 	frappe.msgprint(_("Attendance has been marked successfully."))
 
 
@@ -166,9 +153,7 @@ def get_student_guardians(student):
 
 	:param student: Student.
 	"""
-	guardians = frappe.get_all(
-		"Student Guardian", fields=["guardian"], filters={"parent": student}
-	)
+	guardians = frappe.get_all("Student Guardian", fields=["guardian"], filters={"parent": student})
 	return guardians
 
 
@@ -263,17 +248,19 @@ def get_course_schedule_events(start, end, filters=None):
 	from frappe.desk.calendar import get_event_conditions
 
 	conditions = get_event_conditions("Course Schedule", filters)
-
-	data = frappe.db.sql(
+	# get_event_conditions returns a framework-generated, permission-aware SQL fragment.
+	query = (  # nosemgrep: frappe-sql-format-injection
 		"""select name, course, color,
 			timestamp(schedule_date, from_time) as from_time,
 			timestamp(schedule_date, to_time) as to_time,
 			room, student_group, 0 as 'allDay'
 		from `tabCourse Schedule`
 		where ( schedule_date between %(start)s and %(end)s )
-		{conditions}""".format(
-			conditions=conditions
-		),
+		{conditions}""".format(conditions=conditions)
+	)
+
+	data = frappe.db.sql(
+		query,
 		{"start": start, "end": end},
 		as_dict=True,
 		update={"allDay": 0},
@@ -299,7 +286,7 @@ def get_assessment_criteria(course):
 @frappe.whitelist()
 def get_assessment_students(assessment_plan, student_group):
 	student_list = get_student_group_students(student_group)
-	for i, student in enumerate(student_list):
+	for student in student_list:
 		result = get_result(student.student, assessment_plan)
 		if result:
 			student_result = {}
@@ -393,9 +380,7 @@ def mark_assessment_result(assessment_plan, scores):
 				"score": flt(student_score["assessment_details"][criteria]),
 			}
 		)
-	assessment_result = get_assessment_result_doc(
-		student_score["student"], assessment_plan
-	)
+	assessment_result = get_assessment_result_doc(student_score["student"], assessment_plan)
 	assessment_result.update(
 		{
 			"student": student_score.get("student"),
@@ -423,7 +408,7 @@ def mark_assessment_result(assessment_plan, scores):
 def submit_assessment_results(assessment_plan, student_group):
 	total_result = 0
 	student_list = get_student_group_students(student_group)
-	for i, student in enumerate(student_list):
+	for student in student_list:
 		doc = get_result(student.student, assessment_plan)
 		if doc and doc.docstatus == 0:
 			total_result += 1
@@ -501,9 +486,7 @@ def get_current_enrollment(student, academic_year=None):
 
 @frappe.whitelist()
 def get_instructors(student_group):
-	return frappe.get_all(
-		"Student Group Instructor", {"parent": student_group}, pluck="instructor"
-	)
+	return frappe.get_all("Student Group Instructor", {"parent": student_group}, pluck="instructor")
 
 
 @frappe.whitelist()
@@ -647,9 +630,7 @@ def apply_leave_based_on_course_schedule(leave_data, program_name):
 
 def apply_leave_based_on_student_group(leave_data, program_name):
 	student_groups = get_student_groups(leave_data.get("student"), program_name)
-	leave_dates = get_dates_from_timegrain(
-		leave_data.get("from_date"), leave_data.get("to_date")
-	)
+	leave_dates = get_dates_from_timegrain(leave_data.get("from_date"), leave_data.get("to_date"))
 	for student_group in student_groups:
 		for leave_date in leave_dates:
 			make_attendance_records(
@@ -689,17 +670,15 @@ def get_student_invoices(student):
 	for si in sales_invoice_list:
 		student_program_invoice_status = {}
 		student_program_invoice_status["status"] = si.status
-		student_program_invoice_status["program"] = get_program_from_fee_schedule(
-			si.fee_schedule
-		)
+		student_program_invoice_status["program"] = get_program_from_fee_schedule(si.fee_schedule)
 		symbol = get_currency_symbol(si.get("currency", "INR"))
 		student_program_invoice_status["amount"] = symbol + " " + str(si.outstanding_amount)
 		student_program_invoice_status["invoice"] = si.name
 		if si.status == "Paid":
 			student_program_invoice_status["amount"] = symbol + " " + str(si.grand_total)
-			student_program_invoice_status[
-				"payment_date"
-			] = get_posting_date_from_payment_entry_against_sales_invoice(si.name)
+			student_program_invoice_status["payment_date"] = (
+				get_posting_date_from_payment_entry_against_sales_invoice(si.name)
+			)
 			student_program_invoice_status["due_date"] = "-"
 		else:
 			student_program_invoice_status["due_date"] = si.due_date
@@ -743,17 +722,13 @@ def get_fees_print_format():
 
 def get_program_from_fee_schedule(fee_schedule):
 
-	program = frappe.db.get_value(
-		"Fee Schedule", filters={"name": fee_schedule}, fieldname=["program"]
-	)
+	program = frappe.db.get_value("Fee Schedule", filters={"name": fee_schedule}, fieldname=["program"])
 	return program
 
 
 @frappe.whitelist()
 def get_school_abbr_logo():
-	abbr = frappe.db.get_single_value(
-		"Education Settings", "school_college_name_abbreviation"
-	)
+	abbr = frappe.db.get_single_value("Education Settings", "school_college_name_abbreviation")
 	logo = frappe.db.get_single_value("Education Settings", "school_college_logo")
 	return {"name": abbr, "logo": logo}
 

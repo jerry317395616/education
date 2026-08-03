@@ -38,9 +38,7 @@ class StudentApplicant(Document):
 			self.validation_from_student_admission()
 
 	def set_title(self):
-		self.title = " ".join(
-			filter(None, [self.first_name, self.middle_name, self.last_name])
-		)
+		self.title = " ".join(name for name in [self.first_name, self.middle_name, self.last_name] if name)
 
 	def validate_dates(self):
 		if self.date_of_birth and getdate(self.date_of_birth) >= getdate():
@@ -48,9 +46,7 @@ class StudentApplicant(Document):
 
 	def validate_term(self):
 		if self.academic_year and self.academic_term:
-			actual_academic_year = frappe.db.get_value(
-				"Academic Term", self.academic_term, "academic_year"
-			)
+			actual_academic_year = frappe.db.get_value("Academic Term", self.academic_term, "academic_year")
 			if actual_academic_year != self.academic_year:
 				frappe.throw(
 					_("Academic Term {0} does not belong to Academic Year {1}").format(
@@ -65,26 +61,16 @@ class StudentApplicant(Document):
 		if (
 			student_admission
 			and student_admission.min_age
-			and date_diff(
-				nowdate(), add_years(getdate(self.date_of_birth), student_admission.min_age)
-			)
-			< 0
+			and date_diff(nowdate(), add_years(getdate(self.date_of_birth), student_admission.min_age)) < 0
 		):
-			frappe.throw(
-				_("Not eligible for the admission in this program as per Date Of Birth")
-			)
+			frappe.throw(_("Not eligible for the admission in this program as per Date Of Birth"))
 
 		if (
 			student_admission
 			and student_admission.max_age
-			and date_diff(
-				nowdate(), add_years(getdate(self.date_of_birth), student_admission.max_age)
-			)
-			> 0
+			and date_diff(nowdate(), add_years(getdate(self.date_of_birth), student_admission.max_age)) > 0
 		):
-			frappe.throw(
-				_("Not eligible for the admission in this program as per Date Of Birth")
-			)
+			frappe.throw(_("Not eligible for the admission in this program as per Date Of Birth"))
 
 	def on_payment_authorized(self, *args, **kwargs):
 		self.db_set("paid", 1)

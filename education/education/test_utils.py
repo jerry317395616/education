@@ -1,9 +1,9 @@
 import frappe
+from erpnext.setup.utils import enable_all_roles_and_domains
+from frappe.utils import add_years, now_datetime, nowdate
+
 from education.education.doctype.fee_schedule.fee_schedule import get_fee_structure
 from education.education.doctype.student_group.student_group import get_students
-from erpnext.setup.utils import enable_all_roles_and_domains
-from frappe.utils import now_datetime, add_years, nowdate
-
 
 DEFAULT_PROGRAM_NAME = "Class 1"
 DEFAULT_ACADEMIC_YEAR = "2023-2024"
@@ -39,9 +39,7 @@ def before_tests():
 			}
 		)
 
-	frappe.db.set_value(
-		"Stock Settings", None, "auto_insert_price_list_rate_if_missing", 0
-	)
+	frappe.db.set_single_value("Stock Settings", "auto_insert_price_list_rate_if_missing", 0)
 	enable_all_roles_and_domains()
 	make_holiday_list()
 	frappe.db.commit()
@@ -62,9 +60,7 @@ def make_holiday_list(holiday_list_name="Test Holiday List"):
 		holiday_list.save()
 
 
-def create_academic_year(
-	academic_year_name=DEFAULT_ACADEMIC_YEAR, year_start_date=None, year_end_date=None
-):
+def create_academic_year(academic_year_name=DEFAULT_ACADEMIC_YEAR, year_start_date=None, year_end_date=None):
 	if frappe.db.exists("Academic Year", {"academic_year_name": DEFAULT_ACADEMIC_YEAR}):
 		return
 
@@ -133,9 +129,7 @@ def create_fee_structure(
 	return fee_structure
 
 
-def create_student(
-	first_name="Test", last_name="Student", student_email_id=DEFAULT_STUDENT_EMAIL_ID
-):
+def create_student(first_name="Test", last_name="Student", student_email_id=DEFAULT_STUDENT_EMAIL_ID):
 
 	if frappe.db.exists("Student", {"student_email_id": student_email_id}):
 		return frappe.get_doc("Student", {"student_email_id": student_email_id})
@@ -193,9 +187,7 @@ def create_student_group(
 	return student_group
 
 
-def create_fee_schedule(
-	academic_year=DEFAULT_ACADEMIC_YEAR, submit=False, fee_structure=None
-):
+def create_fee_schedule(academic_year=DEFAULT_ACADEMIC_YEAR, submit=False, fee_structure=None):
 	due_date = frappe.utils.add_days(frappe.utils.nowdate(), 2)
 	fee_structure_name = fee_structure or frappe.db.get_value(
 		"Fee Structure", {"academic_year": academic_year}, "name"
@@ -260,9 +252,7 @@ def create_grading_scale(grading_scale_name="_Test Grading Scale"):
 
 
 def create_company(company_name):
-	company = frappe.get_doc(
-		{"doctype": "Company", "company_name": company_name, "default_currency": "INR"}
-	)
+	company = frappe.get_doc({"doctype": "Company", "company_name": company_name, "default_currency": "INR"})
 	company.insert(ignore_if_duplicate=True)
 
 

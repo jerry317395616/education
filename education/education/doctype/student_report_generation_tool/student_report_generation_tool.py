@@ -30,11 +30,10 @@ def preview_report_card(doc):
 	letterhead = get_letter_head(doc, not doc.add_letterhead)
 
 	# get the attendance of the student for that peroid of time.
-	doc.attendance = get_attendance_count(
-		doc.students[0], doc.academic_year, doc.academic_term
-	)
+	doc.attendance = get_attendance_count(doc.students[0], doc.academic_year, doc.academic_term)
 
-	html = frappe.render_template(
+	# The template path is an application-owned constant; only its context contains request data.
+	html = frappe.render_template(  # nosemgrep: frappe-ssti
 		"education/education/doctype/student_report_generation_tool/student_report_generation_tool.html",
 		{
 			"doc": doc,
@@ -46,7 +45,8 @@ def preview_report_card(doc):
 		},
 	)
 
-	final_template = frappe.render_template(
+	# Frappe's bundled print view is a fixed trusted template.
+	final_template = frappe.render_template(  # nosemgrep: frappe-ssti
 		"frappe/www/printview.html", {"body": html, "title": "Report Card"}
 	)
 

@@ -2,8 +2,8 @@
 # For license information, please see license.txt
 
 import frappe
-from frappe.model.document import Document
 from frappe import _
+from frappe.model.document import Document
 
 
 class FeeCategory(Document):
@@ -19,8 +19,7 @@ class FeeCategory(Document):
 
 	def on_update(self):
 		# update item
-		item_name = update_item(self)
-		self.item = item_name
+		update_item(self)
 
 	def on_trash(self):
 		# delete item
